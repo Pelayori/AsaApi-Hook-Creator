@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -9,9 +11,13 @@ namespace TrampolineCreator
 {
     public partial class Form1 : Form
     {
+        private List<string> _CachedOffsets = new List<string>();
+
         public Form1()
         {
             InitializeComponent();
+            _CachedOffsets = LoadCachedOffsets(ConfigurationManager.AppSettings["CachedOffsetsFilePath"]);
+            ModeSelection(ConfigurationManager.AppSettings["DarkMode"]);
         }
 
         bool LoadingHeaders = false;
@@ -19,6 +25,18 @@ namespace TrampolineCreator
         Dictionary<string, Dictionary<int, string>> StructureSelector = new Dictionary<string, Dictionary<int, string>>();
         Dictionary<int, string> FunctionSelector = new Dictionary<int, string>();
         Dictionary<int, int> FunctionIndexer = new Dictionary<int, int>();
+
+        private void ModeSelection(string mode)
+        {
+             if (mode == "true") // Dark Mode
+            {
+                this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+                this.ForeColor = System.Drawing.Color.Black;
+
+                richTextBox1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+                richTextBox1.ForeColor = System.Drawing.Color.Black;
+            }
+        }
 
         private void AddFunction(int ClassIndex, string Structure, int FunctionIndex, string Function)
         {
@@ -43,6 +61,50 @@ namespace TrampolineCreator
         private void GameCombo_SelectedIndexChanged(object sender, EventArgs e)
         {
             LoadHeaders();
+        }
+
+        private List<string> LoadCachedOffsets(string filename)
+        {
+            if (filename == null || filename.Length == 0)
+            {
+                MessageBox.Show("Invalid Cached Offsets File Path detected.\nPlease update the config file with a proper file path.\n\nUnable to continue and will close!", "Cached Offsets File Missing", MessageBoxButtons.OK);
+                this.Close();
+                Application.Exit();
+            }
+
+            var lines = new List<string>();
+
+            try
+            {
+                using (StreamReader reader = new StreamReader(filename))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        lines.Add(line);
+                    }
+                }
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("An IO exception has been thrown!");
+                Console.WriteLine(e.ToString());
+                throw e;
+            }
+
+            return lines;
+        }
+
+        private string FindHookSignature(string searchText)
+        {
+            string searchValue = $"{searchText}(";
+            foreach (string signature in _CachedOffsets)
+            {
+                if (signature.StartsWith(searchValue))
+                    return signature;
+            }
+
+            return $"{searchText}()";
         }
 
         private void LoadHeaders()
@@ -186,6 +248,7 @@ namespace TrampolineCreator
                 string nativeCallString = splitNativeCallParenthesis[1];
                 string[] nativeCallArgs = nativeCallString.Split('"');
                 string nativeCall = nativeCallArgs[1] + "(" + splitNativeCallParenthesis[2].Split(')')[0] + ")";
+                string hookSignature = FindHookSignature(nativeCallArgs[1]);
 
                 string thisArg = nativeCallString.Contains("this,") ? $"{StructCombo.Text}* _this{(nativeCall.Contains("()") ? "" : ", ")}" : "";
                 string hookName = $"Hook_{StructCombo.Text}_{funcName}({thisArg}{args})";
@@ -207,8 +270,8 @@ namespace TrampolineCreator
 
                 string setHookName = hookName.Split('(')[0];
                 string setHookTramp = $"{StructCombo.Text}_{funcName}_original";
-                string setHook = $"AsaApi::GetHooks().SetHook(\"{nativeCall}\", &{setHookName}, &{setHookTramp});";
-                string disableHook = $"AsaApi::GetHooks().DisableHook(\"{nativeCall}\", &{setHookName});";
+                string setHook = $"AsaApi::GetHooks().SetHook(\"{hookSignature}\", &{setHookName}, &{setHookTramp});";
+                string disableHook = $"AsaApi::GetHooks().DisableHook(\"{hookSignature}\", &{setHookName});";
 
                 richTextBox1.AppendText(setHook + "\n\n");
                 richTextBox1.AppendText(disableHook);
