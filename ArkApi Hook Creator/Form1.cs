@@ -17,6 +17,7 @@ namespace TrampolineCreator
         {
             InitializeComponent();
             _CachedOffsets = LoadCachedOffsets(ConfigurationManager.AppSettings["CachedOffsetsFilePath"]);
+            ModeSelection(ConfigurationManager.AppSettings["DarkMode"]);
         }
 
         bool LoadingHeaders = false;
@@ -24,6 +25,18 @@ namespace TrampolineCreator
         Dictionary<string, Dictionary<int, string>> StructureSelector = new Dictionary<string, Dictionary<int, string>>();
         Dictionary<int, string> FunctionSelector = new Dictionary<int, string>();
         Dictionary<int, int> FunctionIndexer = new Dictionary<int, int>();
+
+        private void ModeSelection(string mode)
+        {
+             if (mode == "true") // Dark Mode
+            {
+                this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+                this.ForeColor = System.Drawing.Color.Black;
+
+                richTextBox1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
+                richTextBox1.ForeColor = System.Drawing.Color.Black;
+            }
+        }
 
         private void AddFunction(int ClassIndex, string Structure, int FunctionIndex, string Function)
         {
